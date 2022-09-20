@@ -9,8 +9,8 @@ sudo ip -n public l add dummy type dummy
 sudo ip -n private l add dummy type dummy
 
 # Set IP addresses
-sudo ip -n public a add 10.10.10.10 dev dummy
-sudo ip -n private a add 172.20.0.2 dev dummy
+sudo ip -n public a add 10.10.10.10/32 dev dummy
+sudo ip -n private a add 172.20.0.2/32 dev dummy
 
 # Bring links up
 sudo ip -n public l set lo up
