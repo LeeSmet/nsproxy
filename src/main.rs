@@ -12,11 +12,11 @@ fn main() {
         .unwrap();
 
     loop {
-        let (con, remote) = listener.accept().unwrap();
+        let (mut con, remote) = listener.accept().unwrap();
         println!("Accepted new connection from {}", remote);
 
         let private = NetNs::get("private").unwrap();
-        let remote = private
+        let mut remote = private
             .run(|_| TcpStream::connect("172.20.0.2:80").unwrap())
             .unwrap();
 
@@ -30,27 +30,51 @@ fn main() {
             .set_write_timeout(con.write_timeout().unwrap())
             .unwrap();
 
-        std::thread::spawn(move || {
-            std::thread::scope(|s| {
-                let mut listener_reader: Box<dyn io::Read + Send> = Box::new(&con);
-                let mut listener_writer: Box<dyn io::Write + Send> = Box::new(&con);
-                let mut remote_reader: Box<dyn io::Read + Send> = Box::new(&remote);
-                let mut remote_writer: Box<dyn io::Write + Send> = Box::new(&remote);
-                let r = &remote;
+        let mut listener_writer = con
+            .try_clone()
+            .expect("Can create a new handle to listener socket");
+        let mut remote_writer = remote
+            .try_clone()
+            .expect("Can create a new handle to a proxy socket");
 
-                s.spawn(move || {
-                    println!("Start copy frontend -> backend");
-                    let c = io::copy(&mut listener_reader, &mut remote_writer).unwrap();
-                    println!("Stop copy frontend -> backend ({} bytes copied)", c);
-                    r.shutdown(std::net::Shutdown::Both).unwrap();
-                });
+        std::thread::Builder::new()
+            .name("frontend_proxy".to_string())
+            .spawn(move || {
+                println!("Start copy frontend -> backend");
+                match io::copy(&mut con, &mut remote_writer) {
+                    // Copy stopped, meaning we got an EOF from remote.
+                    Ok(_) => {}
+                    // Copy got an error, but we are not sure which side it came from
+                    Err(_) => {
+                        // Try to shut down remote in case the error is caused by the other side
+                        // Don't care about error shutting down
+                        let _ = con.shutdown(std::net::Shutdown::Both);
+                    }
+                };
+                println!("Stop copy remote -> frontend");
+                // Again don't care about errors here, this is best effort
+                let _ = remote_writer.shutdown(std::net::Shutdown::Both);
+            })
+            .unwrap();
 
-                s.spawn(move || {
-                    println!("Start copy remote -> frontend");
-                    let c = io::copy(&mut remote_reader, &mut listener_writer).unwrap();
-                    println!("Stop copy remote -> frontend ({} bytes copied)", c);
-                });
-            });
-        });
+        std::thread::Builder::new()
+            .name("backend_proxy".to_string())
+            .spawn(move || {
+                println!("Start copy remote -> frontend");
+                match io::copy(&mut remote, &mut listener_writer) {
+                    // Copy stopped, meaning we got an EOF from remote.
+                    Ok(_) => {}
+                    // Copy got an error, but we are not sure which side it came from
+                    Err(_) => {
+                        // Try to shut down remote in case the error is caused by the other side
+                        // Don't care about error shutting down
+                        let _ = remote.shutdown(std::net::Shutdown::Both);
+                    }
+                };
+                println!("Stop copy remote -> frontend");
+                // Again don't care about errors here, this is best effort
+                let _ = listener_writer.shutdown(std::net::Shutdown::Both);
+            })
+            .unwrap();
     }
 }

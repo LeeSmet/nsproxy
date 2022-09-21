@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 netns-rs = "0.1"
+
+[profile.release]
+lto = "fat"
