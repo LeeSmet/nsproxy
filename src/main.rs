@@ -10,12 +10,12 @@ fn main() {
     let listener = public
         .run(|_| TcpListener::bind("10.10.10.10:80").unwrap())
         .unwrap();
+    let private = NetNs::get("private").unwrap();
 
     loop {
         let (mut con, remote) = listener.accept().unwrap();
         println!("Accepted new connection from {}", remote);
 
-        let private = NetNs::get("private").unwrap();
         let mut remote = private
             .run(|_| TcpStream::connect("172.20.0.2:80").unwrap())
             .unwrap();
