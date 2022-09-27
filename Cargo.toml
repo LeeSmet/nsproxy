@@ -2,6 +2,10 @@
 name = "nsproxy"
 version = "0.1.0"
 edition = "2021"
+authors = ["Lee Smet <lee.smet@hotmail.com>"]
+readme = "./README.md"
+repository = "https://github.com/LeeSmet/nsproxy"
+license-file = "./LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
