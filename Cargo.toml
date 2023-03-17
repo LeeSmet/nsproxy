@@ -13,4 +13,5 @@ license-file = "./LICENSE"
 netns-rs = "0.1"
 
 [profile.release]
+codegen-units = 1
 lto = "fat"
